@@ -73,11 +73,20 @@ python scripts/prepare_pretrained_checkpoint.py \
   --output checkpoints/dinov2_vits14_reg4_pretrain_wrapped_224.pth --target-crop-size 224
 ```
 
-### B4 `[C]` fix config paths (no-op if $HOME is /home/vmanousi)
+### B4 `[C]` config paths — auto-resolve via `${oc.env:HOME}`
+No editing needed as long as the repo lives at `$HOME/continue_ssl_pretrain_dinov2`.
+Just sanity-check they resolve to real files:
 ```bash
-sed -i "s#/home/vmanousi/continue_ssl_pretrain_dinov2#$HOME/continue_ssl_pretrain_dinov2#g" \
-  dinov2/dinov2/configs/train/vits14_reg4_hyperkvasir_continued.yaml
-grep -E "root=|pretrained_weights" dinov2/dinov2/configs/train/vits14_reg4_hyperkvasir_continued.yaml
+python - <<'PY'
+import os, sys; sys.path.insert(0, "dinov2")
+from omegaconf import OmegaConf
+from dinov2.configs import load_and_merge_config
+c = OmegaConf.to_container(load_and_merge_config("train/vits14_reg4_hyperkvasir_continued"), resolve=True)
+root = c["train"]["dataset_path"].split("root=")[1].split(":")[0]
+w = c["student"]["pretrained_weights"]
+print("corpus dir exists:", os.path.isdir(root))
+print("checkpoint exists:", os.path.isfile(w))
+PY
 ```
 
 ---

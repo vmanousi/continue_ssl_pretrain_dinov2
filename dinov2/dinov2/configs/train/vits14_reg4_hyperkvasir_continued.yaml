@@ -10,10 +10,10 @@
 # at 2e-4 and shorten the schedule instead). See the project notes for the
 # full parameter comparison.
 #
-# PATHS below assume the repo lives at ~/continue_ssl_pretrain_dinov2 on the
-# cluster. Override on the command line if not:
-#   python -m dinov2.train.train --config-file <this> \
-#       train.dataset_path=HyperKvasir:root=/abs/data/hyperkvasir_ssl:... \
+# PATHS use ${oc.env:HOME} -> they resolve automatically as long as the repo
+# lives at $HOME/continue_ssl_pretrain_dinov2. Override on the command line if
+# it lives elsewhere:
+#   ... train.dataset_path=HyperKvasir:root=/abs/data/hyperkvasir_ssl:...
 #       student.pretrained_weights=/abs/checkpoints/...wrapped_224.pth
 
 MODEL:
@@ -31,7 +31,7 @@ ibot:
 train:
   batch_size_per_gpu: 48           # PLACEHOLDER -- finalise after the cluster GPU memory probe (Step 4).
                                    # ViT-S is much smaller than DINOCell's ViT-B (batch 16), so higher should fit.
-  dataset_path: HyperKvasir:root=/home/vmanousi/continue_ssl_pretrain_dinov2/data/hyperkvasir_ssl:extra=/home/vmanousi/continue_ssl_pretrain_dinov2/data/hyperkvasir_ssl/train_deduped.txt:exclusion_boxes_csv=/home/vmanousi/continue_ssl_pretrain_dinov2/data/hyperkvasir_ssl/exclusion_boxes.csv
+  dataset_path: HyperKvasir:root=${oc.env:HOME}/continue_ssl_pretrain_dinov2/data/hyperkvasir_ssl:extra=${oc.env:HOME}/continue_ssl_pretrain_dinov2/data/hyperkvasir_ssl/train_deduped.txt:exclusion_boxes_csv=${oc.env:HOME}/continue_ssl_pretrain_dinov2/data/hyperkvasir_ssl/exclusion_boxes.csv
   centering: sinkhorn_knopp        # explicit -- the base default "centering" is NOT what real DINOv2 uses
   OFFICIAL_EPOCH_LENGTH: 1000      # 100 epochs * 1000 = 100k iterations total (short, DINOCell-style)
   num_workers: 8
@@ -44,7 +44,7 @@ student:
   ffn_layer: mlp                   # the vits14_reg4 checkpoint is MLP-FFN, not swiglufused -- must match
   block_chunks: 0                  # checkpoint blocks are flat (block_chunks=0) -- must match
   layerscale: 1.0e-05              # must match the checkpoint's LayerScale params (verified: clean load)
-  pretrained_weights: /home/vmanousi/continue_ssl_pretrain_dinov2/checkpoints/dinov2_vits14_reg4_pretrain_wrapped_224.pth
+  pretrained_weights: ${oc.env:HOME}/continue_ssl_pretrain_dinov2/checkpoints/dinov2_vits14_reg4_pretrain_wrapped_224.pth
 
 teacher:
   momentum_teacher: 0.994
