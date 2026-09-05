@@ -1,0 +1,64 @@
+# Continued DINOv2 SSL pretraining on HyperKvasir (GI endoscopy).
+#
+# Base config: dinov2/configs/ssl_default_config.yaml (loaded automatically by train.py).
+#
+# Strategy mirrors DINOCell (arXiv:2604.10609) -- the closest published
+# precedent for continued DINOv2 pretraining on a specialised imaging domain:
+# the real vitl14 recipe, with K reduced for small-batch stability, register
+# tokens, a short schedule, and the STANDARD base_lr (not a hand-reduced tiny
+# LR -- all three official-code continued-pretraining precedents keep base_lr
+# at 2e-4 and shorten the schedule instead). See the project notes for the
+# full parameter comparison.
+#
+# PATHS below assume the repo lives at ~/continue_ssl_pretrain_dinov2 on the
+# cluster. Override on the command line if not:
+#   python -m dinov2.train.train --config-file <this> \
+#       train.dataset_path=HyperKvasir:root=/abs/data/hyperkvasir_ssl:... \
+#       student.pretrained_weights=/abs/checkpoints/...wrapped_224.pth
+
+MODEL:
+  WEIGHTS: ''
+
+dino:
+  head_n_prototypes: 8192          # reduced from 65536 -- DINOCell's small-batch mitigation
+  head_bottleneck_dim: 256         # DinoBloom's explicit ViT-S guidance (vitl uses 384)
+  koleo_loss_weight: 0.1           # unchanged from default -- kept deliberately (see project notes on SK/KoLeo)
+
+ibot:
+  separate_head: true
+  head_n_prototypes: 8192
+
+train:
+  batch_size_per_gpu: 48           # PLACEHOLDER -- finalise after the cluster GPU memory probe (Step 4).
+                                   # ViT-S is much smaller than DINOCell's ViT-B (batch 16), so higher should fit.
+  dataset_path: HyperKvasir:root=/home/vmanousi/continue_ssl_pretrain_dinov2/data/hyperkvasir_ssl:extra=/home/vmanousi/continue_ssl_pretrain_dinov2/data/hyperkvasir_ssl/train_deduped.txt:exclusion_boxes_csv=/home/vmanousi/continue_ssl_pretrain_dinov2/data/hyperkvasir_ssl/exclusion_boxes.csv
+  centering: sinkhorn_knopp        # explicit -- the base default "centering" is NOT what real DINOv2 uses
+  OFFICIAL_EPOCH_LENGTH: 1000      # 100 epochs * 1000 = 100k iterations total (short, DINOCell-style)
+  num_workers: 8
+
+student:
+  arch: vit_small
+  patch_size: 14
+  num_register_tokens: 4
+  drop_path_rate: 0.2              # DINOCell (vitl default is 0.4) -- lighter regularisation for a short run
+  ffn_layer: mlp                   # the vits14_reg4 checkpoint is MLP-FFN, not swiglufused -- must match
+  block_chunks: 0                  # checkpoint blocks are flat (block_chunks=0) -- must match
+  layerscale: 1.0e-05              # must match the checkpoint's LayerScale params (verified: clean load)
+  pretrained_weights: /home/vmanousi/continue_ssl_pretrain_dinov2/checkpoints/dinov2_vits14_reg4_pretrain_wrapped_224.pth
+
+teacher:
+  momentum_teacher: 0.994
+
+optim:
+  epochs: 100
+  warmup_epochs: 20
+  base_lr: 2.0e-04                 # standard -- sqrt-scaled to the real batch by scaling_rule=sqrt_wrt_1024
+  weight_decay_end: 0.2
+  layerwise_decay: 1.0             # no layer-wise LR decay (matches real vitl14 recipe)
+
+crops:
+  global_crops_size: 224
+  local_crops_size: 98             # 14 * 7 -- must be divisible by patch size 14
+
+evaluation:
+  eval_period_iterations: 200000   # > max_iter -- no ImageNet-style eval pipeline wired up; disable
