@@ -32,8 +32,8 @@ mkdir -p "$OUT"
 # BATCH_PER_GPU: set this from the memory probe (Phase C2). Placeholder below.
 BATCH_PER_GPU=${BATCH_PER_GPU:-48}
 
-torchrun --standalone --nproc_per_node="$NGPU" dinov2/train/train.py \
-  --config-file dinov2/dinov2/configs/train/vits14_reg4_hyperkvasir_continued.yaml \
+torchrun --standalone --nproc_per_node="$NGPU" -m dinov2.train.train \
+  --config-file "$PROJECT/dinov2/dinov2/configs/train/vits14_reg4_hyperkvasir_continued.yaml" \
   --output-dir "$OUT" \
   train.batch_size_per_gpu="$BATCH_PER_GPU"
 
