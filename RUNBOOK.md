@@ -108,9 +108,12 @@ CFG=$PWD/dinov2/dinov2/configs/train/vits14_reg4_hyperkvasir_continued.yaml
 
 ### C1 `[C]` smoke test — does the whole pipeline run (10 iterations)
 ```bash
+# NOTE: any short override run needs optim.warmup_epochs small enough that
+# warmup_iters <= total_iters, else CosineScheduler asserts. The real config
+# (epochs=100, warmup_epochs=20) is fine as-is.
 torchrun --standalone --nproc_per_node=1 -m dinov2.train.train --config-file $CFG \
   --output-dir /tmp/smoke \
-  train.batch_size_per_gpu=8 train.OFFICIAL_EPOCH_LENGTH=10 optim.epochs=1 train.num_workers=2
+  train.batch_size_per_gpu=8 train.OFFICIAL_EPOCH_LENGTH=10 optim.epochs=1 optim.warmup_epochs=0 train.num_workers=2
 ```
 Watch for: `# of dataset samples: 108,321`, `OPTIONS -- pretrained weights: loading from ...`,
 `sqrt scaling learning rate`, a finite loss, no crash.
@@ -121,7 +124,7 @@ for BS in 32 48 64 96 128; do
   echo "===== batch_size_per_gpu=$BS ====="
   timeout 400 torchrun --standalone --nproc_per_node=1 -m dinov2.train.train --config-file $CFG \
     --output-dir /tmp/probe_$BS \
-    train.batch_size_per_gpu=$BS train.OFFICIAL_EPOCH_LENGTH=15 optim.epochs=1 train.num_workers=4 \
+    train.batch_size_per_gpu=$BS train.OFFICIAL_EPOCH_LENGTH=15 optim.epochs=1 optim.warmup_epochs=0 train.num_workers=4 \
     2>&1 | tail -3
 done
 ```
@@ -132,7 +135,7 @@ Pick the largest `BS` that finishes without `CUDA out of memory`; use ~10-20% be
 BS=<from C2>
 torchrun --standalone --nproc_per_node=1 -m dinov2.train.train --config-file $CFG \
   --output-dir $PWD/outputs/collapse_check \
-  train.batch_size_per_gpu=$BS train.OFFICIAL_EPOCH_LENGTH=500 optim.epochs=4
+  train.batch_size_per_gpu=$BS train.OFFICIAL_EPOCH_LENGTH=500 optim.epochs=4 optim.warmup_epochs=1
 python - <<'PY'
 import json
 rows=[json.loads(l) for l in open("outputs/collapse_check/training_metrics.json")]

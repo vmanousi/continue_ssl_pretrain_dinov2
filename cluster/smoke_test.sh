@@ -30,6 +30,7 @@ torchrun --standalone --nproc_per_node=1 -m dinov2.train.train \
   train.batch_size_per_gpu=8 \
   train.OFFICIAL_EPOCH_LENGTH=10 \
   optim.epochs=1 \
+  optim.warmup_epochs=0 \
   train.num_workers=4
 
 echo "smoke test finished: $(date)"
