@@ -25,7 +25,11 @@ export PYTHONPATH="$PROJECT/dinov2:${PYTHONPATH:-}"
 
 CFG="$PROJECT/dinov2/dinov2/configs/train/vits14_reg4_hyperkvasir_continued.yaml"
 OUT="$PROJECT/outputs/collapse_check"
-rm -rf "$OUT"; mkdir -p "$OUT"
+# NOTE: do NOT `rm -rf "$OUT"` here -- SLURM has already opened
+# $OUT/slurm_%j.out inside it; wiping the dir orphans the log. Clear only the
+# stale metrics/checkpoint from a previous run.
+mkdir -p "$OUT"
+rm -f "$OUT"/training_metrics.json "$OUT"/model_*.rank_*.pth "$OUT"/last_checkpoint.rank_*
 nvidia-smi
 
 torchrun --standalone --nproc_per_node=1 -m dinov2.train.train \
