@@ -155,9 +155,13 @@ and `dino.koleo_loss_weight=0` (Darcet's mitigations) and repeat C3.
 ```bash
 cd ~/continue_ssl_pretrain_dinov2
 mkdir -p outputs/full_run
-# edit cluster/train_ssl.sh: set BATCH_PER_GPU= and --gres=gpu:N (1 or 2)
 BATCH_PER_GPU=<from C2> sbatch cluster/train_ssl.sh
 ```
+**1 GPU on purpose.** With `world_size==1`, FSDP downgrades `SHARD_GRAD_OP` to
+`NO_SHARD`, so dinov2's sharded-FSDP-internals paths (`free_if_fsdp` / `_handles`
+/ `_reshard`) never execute -- those are what breaks under torch 2.11's FSDP1.
+ViT-S fits one A100-40GB easily. Going multi-GPU would require patching the
+torch-2.11 FSDP1 internals (or downgrading torch), not worth it here.
 
 ### D2 `[C]` monitor
 ```bash

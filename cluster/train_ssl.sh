@@ -4,10 +4,17 @@
 #SBATCH --qos=ampere-extd
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --gres=gpu:2
-#SBATCH --cpus-per-task=16
-#SBATCH --mem=96G
-#SBATCH --time=3-00:00:00
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=64G
+#SBATCH --time=6-00:00:00
+
+# 1 GPU on purpose. With world_size==1 FSDP collapses SHARD_GRAD_OP -> NO_SHARD,
+# so none of dinov2's sharded-FSDP-internals code runs (free_if_fsdp / _handles /
+# _reshard), which is what breaks under torch 2.11's FSDP1. ViT-S (~22M params)
+# fits a single A100-40GB comfortably at the probed batch size. Multi-GPU would
+# need the torch-2.11 FSDP1 internals patched or a torch downgrade -- not worth it
+# for a model this small.
 #SBATCH --output=outputs/full_run/slurm_%j.out
 #SBATCH --error=outputs/full_run/slurm_%j.err
 
