@@ -120,32 +120,21 @@ Watch for: `# of dataset samples: 108,321`, `OPTIONS -- pretrained weights: load
 
 ### C2 `[C]` memory probe — largest batch that fits on one GPU
 ```bash
-for BS in 32 48 64 96 128; do
-  echo "===== batch_size_per_gpu=$BS ====="
-  timeout 400 torchrun --standalone --nproc_per_node=1 -m dinov2.train.train --config-file $CFG \
-    --output-dir /tmp/probe_$BS \
-    train.batch_size_per_gpu=$BS train.OFFICIAL_EPOCH_LENGTH=15 optim.epochs=1 optim.warmup_epochs=0 train.num_workers=4 \
-    2>&1 | tail -3
-done
+sbatch cluster/mem_probe.sh
+tail -n 30 outputs/memprobe/slurm_*.out     # read the SUMMARY block
 ```
-Pick the largest `BS` that finishes without `CUDA out of memory`; use ~10-20% below it.
+DONE 2026-09-06: 64..256 all fit on A100-40GB. Picked **224** (30.6 GB, 77%,
+3.45 s/it, ~65 img/s) — now the config default. 256 fit too (87%) but 224 keeps
+fragmentation headroom for the ~4-day run.
 
-### C3 `[C]` collapse check — a real short run (~2000 iterations), inspect the loss
+### C3 `[C]` collapse check — a real short run (2000 iterations), inspect the loss
 ```bash
-BS=<from C2>
-torchrun --standalone --nproc_per_node=1 -m dinov2.train.train --config-file $CFG \
-  --output-dir $PWD/outputs/collapse_check \
-  train.batch_size_per_gpu=$BS train.OFFICIAL_EPOCH_LENGTH=500 optim.epochs=4 optim.warmup_epochs=1
-python - <<'PY'
-import json
-rows=[json.loads(l) for l in open("outputs/collapse_check/training_metrics.json")]
-for r in rows[::5]:
-    print(r["iteration"], round(r.get("total_loss", float("nan")),3))
-PY
+sbatch cluster/collapse_check.sh
+tail -n 40 outputs/collapse_check/slurm_*.out   # LOSS TRAJECTORY + VERDICT
 ```
 Healthy: loss drifts **down gradually** and stays well above ~1. Collapse =
-plunges to ~0.05 fast / goes NaN. If it collapses → set `train.centering=centering`
-and `dino.koleo_loss_weight=0` (Darcet's mitigations) and repeat C3.
+plunges to ~0.05 fast / goes NaN. If it collapses → rerun with
+`train.centering=centering dino.koleo_loss_weight=0` (Darcet's mitigations).
 
 ---
 

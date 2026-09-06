@@ -29,8 +29,10 @@ ibot:
   head_n_prototypes: 8192
 
 train:
-  batch_size_per_gpu: 48           # PLACEHOLDER -- finalise after the cluster GPU memory probe (Step 4).
-                                   # ViT-S is much smaller than DINOCell's ViT-B (batch 16), so higher should fit.
+  batch_size_per_gpu: 224          # from the C2 probe on one A100-40GB: 30.6/40 GB (77%),
+                                   # 3.45 s/it, ~65 img/s. 256 also fit (87%) but 224 keeps
+                                   # fragmentation headroom for the ~4-day run. sqrt-scaled
+                                   # lr = 2e-4 * sqrt(224/1024) = 9.35e-5.
   dataset_path: HyperKvasir:root=${oc.env:HOME}/continue_ssl_pretrain_dinov2/data/hyperkvasir_ssl:extra=${oc.env:HOME}/continue_ssl_pretrain_dinov2/data/hyperkvasir_ssl/train_deduped.txt:exclusion_boxes_csv=${oc.env:HOME}/continue_ssl_pretrain_dinov2/data/hyperkvasir_ssl/exclusion_boxes.csv
   centering: sinkhorn_knopp        # explicit -- the base default "centering" is NOT what real DINOv2 uses
   OFFICIAL_EPOCH_LENGTH: 1000      # 100 epochs * 1000 = 100k iterations total (short, DINOCell-style)

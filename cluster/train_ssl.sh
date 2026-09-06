@@ -36,8 +36,8 @@ nvidia-smi
 OUT="$PROJECT/outputs/full_run"
 mkdir -p "$OUT"
 
-# BATCH_PER_GPU: set this from the memory probe (Phase C2). Placeholder below.
-BATCH_PER_GPU=${BATCH_PER_GPU:-48}
+# BATCH_PER_GPU: from the Phase C2 probe (largest safe on one A100-40GB).
+BATCH_PER_GPU=${BATCH_PER_GPU:-224}
 
 torchrun --standalone --nproc_per_node="$NGPU" -m dinov2.train.train \
   --config-file "$PROJECT/dinov2/dinov2/configs/train/vits14_reg4_hyperkvasir_continued.yaml" \
