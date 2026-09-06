@@ -61,4 +61,8 @@ crops:
   local_crops_size: 98             # 14 * 7 -- must be divisible by patch size 14
 
 evaluation:
-  eval_period_iterations: 200000   # > max_iter -- no ImageNet-style eval pipeline wired up; disable
+  # In this dinov2 version do_test() runs NO evaluation -- it only saves
+  # eval/training_<it>/teacher_checkpoint.pth ({"teacher": full state_dict}).
+  # So this is really "how often to dump a clean teacher checkpoint for
+  # downstream checkpoint-selection". 10 checkpoints over the 100k-iter run.
+  eval_period_iterations: 10000
