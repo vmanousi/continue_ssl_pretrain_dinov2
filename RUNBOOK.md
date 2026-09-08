@@ -157,19 +157,48 @@ torch-2.11 FSDP1 internals (or downgrading torch), not worth it here.
 squeue -u $USER
 tail -f outputs/full_run/slurm_*.out
 ```
-Checkpoints land in `outputs/full_run/` every `saveckp_freq` epochs
-(`eval/training_*` dirs and `model_*.rank_*.pth`).
+DONE 2026-09-08 (job 2616177, 25h51m). 10 teacher checkpoints in
+`outputs/full_run/eval/training_{9999..99999}/teacher_checkpoint.pth`; loss
+healthy (11.52 -> 7.06, no collapse). `model_*.rank_0.pth` are resume-only.
 
 ---
 
-## Phase E — downstream on GastroHUN  *(code not built yet)*
+## Phase E — downstream on GastroHUN
 
-Needs a standalone port of the `Gastrohun_official` `dinov2_vits14` recipe
-(warmup + ~40% unfreeze + discriminative LR + class-weighted loss + macro-F1
-checkpoint + bootstrap-CI test evaluation). Build this once Phase D produces
-backbone checkpoints, then:
-- extract each candidate SSL checkpoint's backbone,
-- frozen-probe on GastroHUN val → pick the best epoch,
-- fine-tune (student + teacher) with the ported recipe,
-- evaluate generic-DINOv2 vs continued-DINOv2 on the GastroHUN **test** split,
-  same protocol, + a frozen-backbone comparison.
+Standalone port of the `gastrohun-dino` image-classification recipe, in plain
+PyTorch, under `downstream/`. Experiment = **2 backbones x 2 modes**:
+generic (`checkpoints/...wrapped_224.pth`, kind `wrapped` = our SSL init point)
+vs continued (`teacher_checkpoint.pth`, kind `teacher`), each as a frozen linear
+probe and as the 2-phase fine-tune (warm-up head, then unfreeze last 40% blocks).
+
+### E1 `[C]` extra venv deps (one-time)
+```bash
+cd ~/continue_ssl_pretrain_dinov2 && source .venv/bin/activate
+pip install scikit-learn pandas scipy matplotlib
+```
+GastroHUN data is already on the cluster at
+`~/Datasets/GastroHun/{Labeled_Images_GastroHun,official_splits_GastroHun}` --
+the `downstream/` scripts default to those paths.
+
+### E2 `[C]` checkpoint-selection sweep
+```bash
+sbatch cluster/downstream_sweep.sh
+tail -n 20 outputs/downstream/sweep/slurm_*.out     # RANKING block -> BEST_ITER
+```
+Linear-probes all 10 teacher checkpoints (+ generic as reference) on GastroHUN
+val, picks the best by val macro-F1.
+
+### E3 `[C]` the 2x2 comparison
+```bash
+BEST_ITER=<from E2> sbatch cluster/downstream_experiment.sh
+tail -n 20 outputs/downstream/exp/slurm_*.out        # RESULTS block
+```
+Trains the 4 conditions, evaluates each on the **Test** split with bootstrap CI.
+Per condition, `outputs/downstream/exp/<name>/`: `best-model-val_f1_macro.pt`,
+`summary.json`, `predict.json`, `metrics.csv`, `bootstrap.json`,
+`confusion_matrix.png`.
+
+### E4 sanity cross-check
+Compare `generic_finetuned` test macro-F1 against `gastrohun-dino`'s published
+`dinov2_vits14` = 72.96 (that used the **no-register** variant + a different
+pipeline, so expect a few points of drift; close = port validated).
